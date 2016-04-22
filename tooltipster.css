@@ -1,3 +1,18 @@
+.tooltipster-default span img{
+	float:left;
+	max-width:100px;
+	max-height:100px;
+	padding:10px;
+}
+.tooltipster-default span a{
+	z-index:9999;
+	position:relative;
+	pointer-events:auto;
+}
+.tooltipster-default span p{
+	margin:0;
+	padding:5px;
+}
 /* This is the default Tooltipster theme (feel free to modify or duplicate and create multiple themes!): */
 .tooltipster-default {
 	border-radius: 5px; 
