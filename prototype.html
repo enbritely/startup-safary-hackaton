@@ -1,0 +1,203 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>ShaderTube prtotype</title>
+	<link rel="stylesheet" href="main.css">
+	<link name="author" href="https://plus.google.com/u/0/117485721567694294573">
+	<meta name="description" content="Prototype app to render shaders from ShaderToy">
+	<meta http-equiv="Content-Language" content="en">
+	<style type="text/css">
+		* {
+			margin: 0;
+			padding: 0;
+		}
+	</style>
+</head>
+<body>
+
+	  <script id="vertexShader" type="x-shader/x-vertex">
+		varying vec2 vUv;
+		void main() {
+		  vUv = uv;
+		  gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+		}
+	  </script>
+	  
+
+	    <script id="fragmentShader" type="x-shader/x-fragment">
+	  // Author @patriciogv - 2015
+	  // http://patriciogonzalezvivo.com
+	  // https://www.shadertoy.com/view/MlfXzN
+	  // Modified by 2Pha
+
+	  uniform vec3 colour;
+	  uniform float rows;
+	  uniform float glow;
+	  uniform float glowRadius;
+	  uniform float charDetail;
+	  uniform float speed;
+	  uniform float iGlobalTime;
+	  varying vec2 vUv;
+
+	  float random(in float x){
+	      return fract(sin(x)*43758.5453);
+	  }
+
+	  float random(in vec2 st){
+	      return fract(sin(dot(st.xy ,vec2(12.9898,78.233))) * 43758.5453);
+	  }
+
+	  float randomChar(in vec2 outer,in vec2 inner){
+	      float grid = charDetail;
+	      vec2 margin = vec2(.2,.05);
+	      float seed = 23.;
+	      vec2 borders = step(margin,inner)*step(margin,1.-inner);
+	      return step(.5,random(outer*seed+floor(inner*grid))) * borders.x * borders.y;
+	  }
+
+	  vec3 matrix(in vec2 st){
+	      vec2 ipos = floor(st*rows)+vec2(1.,0.);
+
+	      ipos += vec2(.0,floor(iGlobalTime*speed*random(ipos.x)));
+
+	      vec2 fpos = fract(st*rows);
+	      vec2 center = (.5-fpos);
+
+	      float pct = random(ipos);
+	      float glowamount = (glowRadius-dot(center,center)*3.)*glow;
+
+	      return vec3(randomChar(ipos,fpos) * pct * glowamount) * colour;
+	  }
+
+	  void main() {
+	      gl_FragColor = vec4(matrix(vUv),1.0);
+	  }
+	    </script>
+
+
+
+	<script src="temp/js/Detector.js"></script>
+	<script type="text/javascript" src="three.min.js"></script>
+
+	<script type="text/javascript">
+
+		/**
+		 * Maybe load ThreeJS via CDN
+		 * https://cdnjs.cloudflare.com/ajax/libs/three.js/r76/three.min.js
+		 */
+		var APIKEY = 'BdrtWN';
+		var api = {
+			'list': 'https://crossorigin.me/https://www.shadertoy.com/api/v1/shaders??sort=popular&key=' + APIKEY,
+			'test': 'https://crossorigin.me/https://www.shadertoy.com/api/v1/shaders/Ml2GRD?key=' + APIKEY
+		}
+
+		var App = function(){
+			this.fragmentShader = '';
+		}
+
+		App.prototype.init = function(){
+		}
+
+		/**
+		 * Start loading the first shader and initialize application
+		 */
+		var ShaderApp = new App();
+
+		fetch( api.test, {
+			method: 'get'
+		}).then(function(response) {
+			response.json().then(function(response){
+				console.log(response)
+
+				ShaderApp.fragmentShader = response.Shader.renderpass[0].code;
+			
+				init();
+				animate();
+			});
+		}).catch(function(err) {
+			console.log(err)
+		});
+
+		if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+		var canvas = document.querySelector('canvas');
+		var camera, scene, renderer;
+		var mesh, material, uniforms;
+		var clock = new THREE.Clock(1);
+
+		function init(){
+		  renderer = new THREE.WebGLRenderer();
+		  renderer.setPixelRatio(window.devicePixelRatio);
+		  renderer.setSize(window.innerWidth, window.innerHeight);
+		  document.body.appendChild(renderer.domElement);
+
+		  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 1000);
+		  camera.position.z = 400;
+
+		  scene = new THREE.Scene();
+		  
+		  uniforms = {
+		      colour: { type: "c", value: new THREE.Color(0x89ff89) },
+		      rows: { type: "f", value: 15},
+		      glow: { type: "f", value: 1.0},
+		      glowRadius: { type: "f", value: 1.0},
+		      charDetail: { type: "f", value: 3.0},
+		      speed: { type: "f", value: 10.0},
+		      iGlobalTime: { type: "f", value: clock.getDelta(), hidden: 1}
+		  };
+		  var vertexShader = document.getElementById('vertexShader').text;
+		  // var fragmentShader = ShaderApp.fragmentShader;
+		  var fragmentShader =  document.getElementById('fragmentShader').text;;
+
+		  material = new THREE.ShaderMaterial({
+		        uniforms : uniforms,
+		        vertexShader : vertexShader,
+		        fragmentShader : fragmentShader,
+		  });
+		  
+		  // var geometry = new THREE.BoxGeometry(200, 200, 200);
+		  // mesh = new THREE.Mesh(geometry, material);
+		  // scene.add(mesh);
+
+		  var plane = new THREE.Mesh( new THREE.PlaneGeometry( window.innerWidth, window.innerHeight,1,1), material);
+
+		  scene.add(plane);
+
+		  window.addEventListener('resize', onWindowResize, false);
+
+		}
+		
+		function onWindowResize() {
+		  camera.aspect = window.innerWidth / window.innerHeight;
+		  camera.updateProjectionMatrix();
+		  renderer.setSize(window.innerWidth, window.innerHeight);
+		}
+		
+		function animate() {
+		  requestAnimationFrame(animate);
+		  // mesh.rotation.x += 0.005;
+		  // mesh.rotation.y += 0.01;
+		  //console.log(clock.getElapsedTime());
+		  uniforms.iGlobalTime.value = clock.getElapsedTime();
+		  renderer.render(scene, camera);
+		}
+		
+		function changeGeometry(type) {
+		  switch(type){
+		   case "box":
+		     var geometry = new THREE.BoxGeometry(200, 200, 200);
+		     break;
+		   case "sphere":
+		     var geometry = new THREE.SphereGeometry(200, 20, 20);
+		     break;
+		   case"torusknot":
+		     var geometry = new THREE.TorusKnotGeometry();
+		     break;
+		  }
+		  mesh.geometry = geometry;
+		}
+
+
+	</script>
+</body>
